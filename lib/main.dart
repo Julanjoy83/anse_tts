@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 void main() {
   runApp(const MyApp());
@@ -35,6 +37,7 @@ class _MyHomePageState extends State<MyHomePage> {
   final stt.SpeechToText _speech = stt.SpeechToText();
   String _recognizedText = 'Press the button and start speaking';
   bool _isListening = false;
+  String _aiResponse = '';
 
   // Function to start listening
   Future<void> _startListening() async {
@@ -45,6 +48,8 @@ class _MyHomePageState extends State<MyHomePage> {
         setState(() {
           _recognizedText = result.recognizedWords;
         });
+        // Send the recognized text to OpenAI
+        _sendToAI(result.recognizedWords);
       });
     } else {
       setState(() => _recognizedText = "Speech recognition is not available.");
@@ -55,6 +60,41 @@ class _MyHomePageState extends State<MyHomePage> {
   void _stopListening() {
     _speech.stop();
     setState(() => _isListening = false);
+  }
+
+  // Function to send message to OpenAI API and get the response
+  Future<void> _sendToAI(String message) async {
+    try {
+      final response = await http.post(
+        Uri.parse('https://api.openai.com/v1/completions'),
+        headers: {
+          'Authorization':
+              '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', // Remplacez par votre vraie clé API
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'model': 'text-davinci-003', // Modèle spécifique
+          'prompt': message,
+          'max_tokens': 150,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          _aiResponse = data['choices'][0]['text'].toString();
+        });
+      } else {
+        print('Error: ${response.statusCode} - ${response.body}');
+        setState(() {
+          _aiResponse = 'Error: ${response.statusCode}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _aiResponse = 'Error: ${e.toString()}';
+      });
+    }
   }
 
   @override
@@ -75,6 +115,17 @@ class _MyHomePageState extends State<MyHomePage> {
             SizedBox(height: 20),
             Text(
               _recognizedText,
+              style: TextStyle(fontSize: 16, fontStyle: FontStyle.italic),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 20),
+            Text(
+              'AI Response:',
+              style: TextStyle(fontSize: 20),
+            ),
+            SizedBox(height: 20),
+            Text(
+              _aiResponse,
               style: TextStyle(fontSize: 16, fontStyle: FontStyle.italic),
               textAlign: TextAlign.center,
             ),

@@ -30,9 +30,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  http: ^0.13.3  # For OpenAI API calls
-  speech_to_text: ^5.3.0  # Speech-to-text package
-  flutter_tts: ^3.3.8  # Text-to-speech package
+  http: ^0.13.3
+  speech_to_text: ^7.0.0  # Use the latest version to ensure compatibility
+  flutter_tts: ^3.3.8
+  
+
 
 
   # The following adds the Cupertino Icons font to your application.
