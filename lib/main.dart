@@ -66,15 +66,20 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> _sendToAI(String message) async {
     try {
       final response = await http.post(
-        Uri.parse('https://api.openai.com/v1/completions'),
+        Uri.parse('https://api.openai.com/v1/chat/completions'),
         headers: {
           'Authorization':
-              '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', // Remplacez par votre vraie clé API
+              'Bearer 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', // Remplacez par votre vraie clé API
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'model': 'text-davinci-003', // Modèle spécifique
-          'prompt': message,
+          'model': 'gpt-3.5-turbo', // Modèle spécifique
+          'messages': [
+            {
+              'role': 'user',
+              'content': message
+            } // Message structuré pour le chat
+          ],
           'max_tokens': 150,
         }),
       );
@@ -82,7 +87,7 @@ class _MyHomePageState extends State<MyHomePage> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() {
-          _aiResponse = data['choices'][0]['text'].toString();
+          _aiResponse = data['choices'][0]['message']['content'].toString();
         });
       } else {
         print('Error: ${response.statusCode} - ${response.body}');
