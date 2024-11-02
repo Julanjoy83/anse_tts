@@ -69,7 +69,6 @@ class _MyHomePageState extends State<MyHomePage> {
         Uri.parse('https://api.openai.com/v1/chat/completions'),
         headers: {
           'Authorization':
-              'Bearer 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', // Remplacez par votre vraie clé API
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
