@@ -16,7 +16,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Démo chatbot IA - anjoyit CDS',
-      theme: ThemeData(primarySwatch: Colors.blue),
+      theme: ThemeData.dark(),
       home: const MyHomePage(title: 'Démo chatbot IA - anjoyit'),
     );
   }
@@ -38,7 +38,7 @@ class _MyHomePageState extends State<MyHomePage>
   String _recognizedText = 'Appuyez sur le bouton et commencez à parler';
   bool _isListening = false;
   String _aiResponse = '';
-  String? _qrCodeData; // QR code data pour les directions Google Maps
+  String? _qrCodeData;
   late AnimationController _animationController;
 
   @override
@@ -89,237 +89,180 @@ class _MyHomePageState extends State<MyHomePage>
   }
 
   Future<void> _sendQuestionToAI(String question) async {
-    // APIKEY
-    const String bearerToken =
-        '';
+    const String bearerToken = '';
+
+    setState(() {
+      _aiResponse = '';
+      _qrCodeData = null;
+    });
 
     try {
-      // Vérifier si la question concerne un trajet
-      if (isDirectionsQuestion(question)) {
-        final locations = extractLocations(question);
-        if (locations != null) {
-          final origin = locations['origin']!;
-          final destination = locations['destination']!;
-          final directionsLink =
-              generateGoogleMapsDirectionsLink(origin, destination);
+      final response = await http.post(
+        Uri.parse('https://api.openai.com/v1/chat/completions'),
+        headers: {
+          'Authorization': 'Bearer $bearerToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'model': 'gpt-3.5-turbo',
+          'messages': [
+            {'role': 'user', 'content': question}
+          ],
+        }),
+      );
 
-          setState(() {
-            _qrCodeData = directionsLink;
-            _aiResponse = 'Voici le trajet entre $origin et $destination.';
-          });
-        } else {
-          setState(() {
-            _qrCodeData = null;
-            _aiResponse = 'Je n’ai pas compris les lieux.';
-          });
-        }
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          _aiResponse = data['choices'][0]['message']['content'].toString();
+        });
       } else {
-        final response = await http.post(
-          Uri.parse('https://api.openai.com/v1/chat/completions'),
-          headers: {
-            'Authorization': bearerToken,
-            'Content-Type': 'application/json',
-          },
-          body: jsonEncode({
-            'model': 'gpt-3.5-turbo',
-            'messages': [
-              {
-                'role': 'system',
-                'content':
-                    'Tu es un assistant intelligent qui répond dans la langue utilisée.'
-              },
-              {
-                'role': 'user',
-                'content': question,
-              }
-            ],
-            'max_tokens': 150,
-          }),
-        );
-
-        if (response.statusCode == 200) {
-          final data = json.decode(utf8.decode(response.bodyBytes));
-          setState(() {
-            _aiResponse = data['choices'][0]['message']['content'].toString();
-          });
-          _speak(_aiResponse);
-        } else {
-          setState(() {
-            _aiResponse =
-                'Erreur : ${response.statusCode} - ${response.reasonPhrase}';
-          });
-        }
+        setState(() {
+          _aiResponse = 'Erreur ${response.statusCode}: ${response.reasonPhrase}';
+        });
       }
     } catch (e) {
       setState(() {
-        _aiResponse = 'Erreur de connexion : ${e.toString()}';
+        _aiResponse = 'Erreur : ${e.toString()}';
       });
     }
-  }
-
-  Future<void> _speak(String text) async {
-    await _flutterTts.speak(text);
-  }
-
-  // Vérifie si la question concerne un trajet
-  bool isDirectionsQuestion(String question) {
-    return question.toLowerCase().contains('aller de') &&
-        question.toLowerCase().contains('à');
-  }
-
-  // Extrait les lieux A et B
-  Map<String, String>? extractLocations(String question) {
-    final RegExp regex = RegExp(r'aller de (.*?) à (.*)', caseSensitive: false);
-    final match = regex.firstMatch(question);
-
-    if (match != null) {
-      return {
-        'origin': match.group(1)!.trim(),
-        'destination': match.group(2)!.trim(),
-      };
-    }
-    return null;
-  }
-
-  // Génère un lien Google Maps pour un trajet
-  String generateGoogleMapsDirectionsLink(String origin, String destination) {
-    final Uri directionsUri = Uri.https(
-      'www.google.com',
-      '/maps/dir/',
-      {
-        'api': '1',
-        'origin': origin,
-        'destination': destination,
-      },
-    );
-    return directionsUri.toString();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        title: Text(
-          widget.title,
-          style: const TextStyle(
-            color: Colors.blue,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        title: Text(widget.title),
         centerTitle: true,
-        elevation: 0,
+        backgroundColor: const Color(0xFF2A2A72),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.blue,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  const Text(
-                    'Texte Reconnu :',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    _recognizedText,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontStyle: FontStyle.italic,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
+      body: SafeArea(
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF2A2A72), Color(0xFF009FFD)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            const SizedBox(height: 20),
-            SizedBox(
-              height: 200,
-              child: Center(
-                child: AnimatedBuilder(
-                  animation: _animationController,
-                  builder: (context, child) {
-                    return Container(
-                      width: _isListening
-                          ? 100 + _animationController.value * 20
-                          : 100,
-                      height: _isListening
-                          ? 100 + _animationController.value * 20
-                          : 100,
-                      decoration: BoxDecoration(
-                        color: _isListening ? Colors.blue : Colors.grey,
-                        shape: BoxShape.circle,
+          ),
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 20),
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.blueGrey.shade800,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Text(
+                              'Texte Reconnu :',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            Text(
+                              _recognizedText,
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 16,
+                                fontStyle: FontStyle.italic,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
                       ),
-                    );
-                  },
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        height: 200,
+                        child: Center(
+                          child: AnimatedBuilder(
+                            animation: _animationController,
+                            builder: (context, child) {
+                              return Transform.scale(
+                                scale: 1.0 + (_animationController.value * 0.1),
+                                child: Container(
+                                  width: 100,
+                                  height: 100,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      if (_aiResponse.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.indigo.shade900,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const Text(
+                                'Réponse de l\'IA :',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              Text(
+                                _aiResponse,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 16,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (_qrCodeData != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 20),
+                          child: QrImageView(
+                            data: _qrCodeData!,
+                            version: QrVersions.auto,
+                            size: 200.0,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: _isListening ? _stopListening : _startListening,
-              icon: Icon(_isListening ? Icons.stop : Icons.mic),
-              label: Text(
-                _isListening ? 'Arrêter l\'écoute' : 'Commencer l\'écoute',
-              ),
-            ),
-            const SizedBox(height: 20),
-            if (_aiResponse.isNotEmpty)
-              Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.blue,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
-                        const Text(
-                          'Réponse de l\'IA :',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Text(
-                          _aiResponse,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontStyle: FontStyle.italic,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
+              Padding(
+                padding: const EdgeInsets.all(10),
+                child: ElevatedButton.icon(
+                  onPressed: _isListening ? _stopListening : _startListening,
+                  icon: Icon(_isListening ? Icons.stop : Icons.mic),
+                  label: Text(
+                    _isListening ? 'Arrêter l\'écoute' : 'Commencer l\'écoute',
                   ),
-                  const SizedBox(height: 20),
-                  if (_qrCodeData != null)
-                    QrImageView(
-                      data: _qrCodeData!,
-                      version: QrVersions.auto,
-                      size: 200.0,
-                    ),
-                ],
+                ),
               ),
-          ],
+            ],
+          ),
         ),
       ),
     );
