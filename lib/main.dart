@@ -17,7 +17,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Démo chatbot IA - anjoyit CDS',
       theme: ThemeData.dark(),
-      home: const MyHomePage(title: 'Démo chatbot IA - anjoyit'),
+      home: const MyHomePage(title: 'Démo chatbot IA - anjoyit CDS'),
     );
   }
 }
@@ -62,6 +62,11 @@ class _MyHomePageState extends State<MyHomePage>
   }
 
   Future<void> _startListening() async {
+    // Mettre à jour l'état pour afficher "IA en écoute..."
+    setState(() {
+      _recognizedText = "IA en écoute...";
+    });
+
     bool available = await _speech.initialize(
       onStatus: (status) => print('Statut : $status'),
       onError: (error) => print('Erreur : $error'),
@@ -75,8 +80,10 @@ class _MyHomePageState extends State<MyHomePage>
         });
       });
     } else {
-      setState(() =>
-          _recognizedText = "La reconnaissance vocale n'est pas disponible.");
+      setState(() {
+        _isListening = false;
+        _recognizedText = "La reconnaissance vocale n'est pas disponible.";
+      });
     }
   }
 
@@ -89,43 +96,112 @@ class _MyHomePageState extends State<MyHomePage>
   }
 
   Future<void> _sendQuestionToAI(String question) async {
-    const String bearerToken = '';
+    const String bearerToken =
+        '';
 
+    // Réinitialiser la réponse IA et le QR code à chaque nouvelle question
     setState(() {
       _aiResponse = '';
       _qrCodeData = null;
     });
 
     try {
-      final response = await http.post(
-        Uri.parse('https://api.openai.com/v1/chat/completions'),
-        headers: {
-          'Authorization': 'Bearer $bearerToken',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'model': 'gpt-3.5-turbo',
-          'messages': [
-            {'role': 'user', 'content': question}
-          ],
-        }),
-      );
+      // Vérifier si la question concerne un trajet
+      if (isDirectionsQuestion(question)) {
+        final locations = extractLocations(question);
+        if (locations != null) {
+          final origin = locations['origin']!;
+          final destination = locations['destination']!;
+          final directionsLink =
+          generateGoogleMapsDirectionsLink(origin, destination);
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        setState(() {
-          _aiResponse = data['choices'][0]['message']['content'].toString();
-        });
+          setState(() {
+            _qrCodeData = directionsLink;
+            _aiResponse = 'Voici le trajet entre $origin et $destination.';
+          });
+        } else {
+          setState(() {
+            _qrCodeData = null;
+            _aiResponse = 'Je n’ai pas compris les lieux de destination.';
+          });
+        }
       } else {
-        setState(() {
-          _aiResponse = 'Erreur ${response.statusCode}: ${response.reasonPhrase}';
-        });
+        final response = await http.post(
+          Uri.parse('https://api.openai.com/v1/chat/completions'),
+          headers: {
+            'Authorization': bearerToken,
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'model': 'gpt-3.5-turbo',
+            'messages': [
+              {
+                'role': 'system',
+                'content':
+                'Tu es un assistant intelligent qui répond dans la langue utilisée.'
+              },
+              {
+                'role': 'user',
+                'content': question,
+              }
+            ],
+            'max_tokens': 150,
+          }),
+        );
+
+        if (response.statusCode == 200) {
+          final data = json.decode(utf8.decode(response.bodyBytes));
+          setState(() {
+            _aiResponse = data['choices'][0]['message']['content'].toString();
+          });
+          _speak(_aiResponse);
+        } else {
+          setState(() {
+            _aiResponse =
+            'Erreur : ${response.statusCode} - ${response.reasonPhrase}';
+          });
+        }
       }
     } catch (e) {
       setState(() {
-        _aiResponse = 'Erreur : ${e.toString()}';
+        _aiResponse = 'Erreur de connexion : ${e.toString()}';
       });
     }
+  }
+
+  Future<void> _speak(String text) async {
+    await _flutterTts.speak(text);
+  }
+
+  bool isDirectionsQuestion(String question) {
+    return question.toLowerCase().contains('aller de') &&
+        question.toLowerCase().contains('à');
+  }
+
+  Map<String, String>? extractLocations(String question) {
+    final RegExp regex = RegExp(r'aller de (.*?) à (.*)', caseSensitive: false);
+    final match = regex.firstMatch(question);
+
+    if (match != null) {
+      return {
+        'origin': match.group(1)!.trim(),
+        'destination': match.group(2)!.trim(),
+      };
+    }
+    return null;
+  }
+
+  String generateGoogleMapsDirectionsLink(String origin, String destination) {
+    final Uri directionsUri = Uri.https(
+      'www.google.com',
+      '/maps/dir/',
+      {
+        'api': '1',
+        'origin': origin,
+        'destination': destination,
+      },
+    );
+    return directionsUri.toString();
   }
 
   @override
@@ -182,28 +258,6 @@ class _MyHomePageState extends State<MyHomePage>
                               textAlign: TextAlign.center,
                             ),
                           ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        height: 200,
-                        child: Center(
-                          child: AnimatedBuilder(
-                            animation: _animationController,
-                            builder: (context, child) {
-                              return Transform.scale(
-                                scale: 1.0 + (_animationController.value * 0.1),
-                                child: Container(
-                                  width: 100,
-                                  height: 100,
-                                  decoration: const BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
                         ),
                       ),
                       const SizedBox(height: 20),
