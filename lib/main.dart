@@ -96,6 +96,7 @@ class _MyHomePageState extends State<MyHomePage>
   }
 
   Future<void> _sendQuestionToAI(String question) async {
+    // API KEY HOLD
     const String bearerToken =
         '';
 
