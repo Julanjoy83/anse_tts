@@ -9,7 +9,6 @@ void main() {
   runApp(const MyApp());
 }
 
-// mon application flutter
 class MyApp extends StatelessWidget {
   const MyApp({Key? key}) : super(key: key);
 
@@ -23,7 +22,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-//! page home version 2.0
 class HomePage extends StatelessWidget {
   const HomePage({Key? key}) : super(key: key);
 
@@ -129,7 +127,6 @@ class HomePage extends StatelessWidget {
   }
 }
 
-// classe pour moduler les fonctionnalités écoute + parler (on pourrait centraliser les interactions API dans cette classe à voir!!!!!!)
 class ChatbotUtilities {
   final stt.SpeechToText _speech = stt.SpeechToText();
   final FlutterTts _flutterTts = FlutterTts();
@@ -173,14 +170,12 @@ class ChatbotUtilities {
   bool get isListening => _isListening;
 }
 
-// Fonction pour capitaliser la première lettre du texte RECONNU user prompt (OPTION SECONDAIRE)
 String capitalize(String text) {
   if (text.isEmpty) return text; // Vérifie si le texte est vide
   return text[0].toUpperCase() +
       text.substring(1); // Met la première lettre en majuscule
 }
 
-//! page trajet version 2.0
 class ChatbotTrajetsPage extends StatefulWidget {
   const ChatbotTrajetsPage({Key? key}) : super(key: key);
 
@@ -365,7 +360,6 @@ class _ChatbotTrajetsPageState extends State<ChatbotTrajetsPage> {
   }
 }
 
-//! page hôtel version 2.0
 class ChatbotHotelsPage extends StatefulWidget {
   const ChatbotHotelsPage({Key? key}) : super(key: key);
 
@@ -379,8 +373,7 @@ class _ChatbotHotelsPageState extends State<ChatbotHotelsPage> {
   bool _isProcessing = false; // Indicateur de traitement
   bool _isListening = false; // Indique si le bot est en mode écoute
   String _recognizedText = ''; // Texte reconnu pendant l'écoute
-  final String _cloudbedsApiKey =
-      'cbat_r9TaMprlEWmaga2sNfamTmXePpjW5jdR'; // Remplacez API KEY
+  final String _cloudbedsApiKey = ''; // API KEY ICI
 
   Future<void> handleQuestion(String question) async {
     setState(() {
@@ -641,10 +634,6 @@ class _ChatbotHotelsPageState extends State<ChatbotHotelsPage> {
   }
 }
 
-//! page generale version 2.0
-//! page générale version 2.1
-//! page generale version 2.1 avec champ texte
-//! page generale version 2.2 avec icônes ajoutées
 class ChatbotGeneralPage extends StatefulWidget {
   const ChatbotGeneralPage({Key? key}) : super(key: key);
 
@@ -659,8 +648,8 @@ class _ChatbotGeneralPageState extends State<ChatbotGeneralPage> {
   String? _qrCodeData; // Lien QR Code (si applicable)
   bool _isProcessing = false; // Indicateur de traitement
   bool _isListening = false; // Indicateur pour vérifier si STT est actif
-  final String _cloudbedsApiKey = '';
-  final String _openAiApiKey = '';
+  final String _cloudbedsApiKey = ''; // API KEY ICI
+  final String _openAiApiKey = ''; // API KEY ICI
 
   Future<void> handleQuestion(String question) async {
     setState(() {
