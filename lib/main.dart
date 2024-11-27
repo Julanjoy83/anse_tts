@@ -49,7 +49,8 @@ class HomePage extends StatelessWidget {
             ),
           ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20), // Ajout du padding horizontal
+            padding: const EdgeInsets.symmetric(
+                horizontal: 20), // Ajout du padding horizontal
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -59,7 +60,8 @@ class HomePage extends StatelessWidget {
                   height: 100, // Hauteur du logo
                   fit: BoxFit.contain, // Ajustement de l'image
                 ),
-                const SizedBox(height: 20), // Espacement entre le logo et le texte
+                const SizedBox(
+                    height: 20), // Espacement entre le logo et le texte
                 const Text(
                   'Bonjour, je suis Maria votre assistante IA !',
                   style: TextStyle(
@@ -344,7 +346,9 @@ class _ChatbotTrajetsPageState extends State<ChatbotTrajetsPage> {
                       onPressed: _isListening ? stopListening : startListening,
                       icon: Icon(
                         _isListening ? Icons.stop : Icons.mic,
-                        color: _isListening ? const Color.fromARGB(255, 255, 255, 255) : null,
+                        color: _isListening
+                            ? const Color.fromARGB(255, 255, 255, 255)
+                            : null,
                       ),
                       label: Text(_isListening ? "Stop" : "Écouter"),
                       style: ElevatedButton.styleFrom(
@@ -366,13 +370,14 @@ class _ChatbotTrajetsPageState extends State<ChatbotTrajetsPage> {
 }
 
 //! page hôtel version 2.0
+//! page hôtel version 2.1 - Ajout de la gestion des réservations
+//! page hôtel version 2.2 - Gestion des réservations via OpenAI
 class ChatbotHotelsPage extends StatefulWidget {
   const ChatbotHotelsPage({Key? key}) : super(key: key);
 
   @override
   _ChatbotHotelsPageState createState() => _ChatbotHotelsPageState();
 }
-
 class _ChatbotHotelsPageState extends State<ChatbotHotelsPage> {
   final ChatbotUtilities utils = ChatbotUtilities();
   String _aiResponse = '';
@@ -380,7 +385,9 @@ class _ChatbotHotelsPageState extends State<ChatbotHotelsPage> {
   bool _isListening = false; // Indique si le bot est en mode écoute
   String _recognizedText = ''; // Texte reconnu pendant l'écoute
   final String _cloudbedsApiKey =
-      'cbat_r9TaMprlEWmaga2sNfamTmXePpjW5jdR'; // Remplacez API KEY
+      ''; // Remplacez par votre vraie clé API
+  final String _openAiApiKey =
+      ''; // Remplacez par votre clé OpenAI
 
   Future<void> handleQuestion(String question) async {
     setState(() {
@@ -388,12 +395,13 @@ class _ChatbotHotelsPageState extends State<ChatbotHotelsPage> {
       _aiResponse = "Traitement en cours...";
     });
 
-    if (question.toLowerCase().contains("hôtel") ||
-        question.toLowerCase().contains("réservation")) {
+    if (question.toLowerCase().contains("hôtel") || question.toLowerCase().contains("numéro de téléphone") || question.toLowerCase().contains("adresse")) {
       await _fetchHotelDetails(question);
+    } else if (question.toLowerCase().contains("réservation") || question.toLowerCase().contains("réservé")) {
+      await _fetchReservations(question);
     } else {
       setState(() {
-        _aiResponse = "Je ne comprends pas votre demande.";
+        _aiResponse = "Je ne comprends pas votre demande. Essayez avec des mot-clés comme [Hôtel] ou [Réservation].";
         _isProcessing = false; // Fin du traitement
       });
     }
@@ -429,6 +437,96 @@ class _ChatbotHotelsPageState extends State<ChatbotHotelsPage> {
     }
   }
 
+  Future<void> _fetchReservations(String question) async {
+    final url = 'https://api.cloudbeds.com/api/v1.2/getReservations';
+    try {
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'Authorization': 'Bearer $_cloudbedsApiKey'},
+      );
+
+      if (response.statusCode == 200) {
+        final decodedBody = utf8.decode(response.bodyBytes);
+        final data = json.decode(decodedBody);
+        print(data);
+
+        // Limiter les réservations à 12
+        final limitedData = {
+          "success": data["success"],
+          "data": (data["data"] as List).take(12).toList(),
+        };
+
+        // Envoyer les 12 premières réservations pour analyse
+        await _analyzeReservationsWithOpenAI(limitedData, question);
+      } else {
+        setState(() {
+          _aiResponse = "Erreur lors de la récupération des réservations.";
+          _isProcessing = false; // Fin du traitement
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _aiResponse = "Erreur de connexion : ${e.toString()}";
+        _isProcessing = false; // Fin du traitement
+      });
+    }
+  }
+
+  Future<void> _analyzeReservationsWithOpenAI(
+      Map<String, dynamic> data, String question) async {
+    final String apiUrl = 'https://api.openai.com/v1/chat/completions';
+    final String jsonString = jsonEncode(data['data']);
+    final String prompt = '''
+Voici les données des réservations sous forme de JSON :
+$jsonString
+
+Question : $question
+
+Répondez de manière concise et en français en utilisant les informations des réservations fournies ci-dessus.
+''';
+
+    try {
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {
+          'Authorization': 'Bearer $_openAiApiKey',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'model': 'gpt-3.5-turbo',
+          'messages': [
+            {
+              'role': 'system',
+              'content': 'Tu es un assistant qui analyse des données JSON.'
+            },
+            {'role': 'user', 'content': prompt},
+          ],
+          'max_tokens': 300,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        // Décoder la réponse d'OpenAI
+        final decodedBody = utf8.decode(response.bodyBytes);
+        final data = json.decode(decodedBody);
+        setState(() {
+          _aiResponse = data['choices'][0]['message']['content'];
+          _isProcessing = false; // Fin du traitement
+        });
+      } else {
+        setState(() {
+          _aiResponse = "Erreur lors de l'interrogation de ChatGPT.";
+          _isProcessing = false; // Fin du traitement
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _aiResponse = "Erreur de connexion avec OpenAI : ${e.toString()}";
+        _isProcessing = false; // Fin du traitement
+      });
+    }
+  }
+
   String _analyzeHotelData(Map<String, dynamic> data, String question) {
     final hotelData = data['data'];
 
@@ -438,7 +536,7 @@ class _ChatbotHotelsPageState extends State<ChatbotHotelsPage> {
       final address = hotelData['propertyAddress'];
       return "Adresse : ${address['propertyAddress1']}, ${address['propertyCity']}, ${address['propertyZip']}, ${address['propertyCountry']}";
     } else if (question.toLowerCase().contains("contact")) {
-      return "Téléphone : ${hotelData['propertyPhone']}, Email : ${hotelData['propertyEmail']}";
+      return "Téléphone : \n${hotelData['propertyPhone']},\nEmail : \n${hotelData['propertyEmail']}";
     } else if (question.toLowerCase().contains("description")) {
       return "Description : ${hotelData['propertyDescription']}";
     } else if (question.toLowerCase().contains("équipements")) {
@@ -474,7 +572,8 @@ class _ChatbotHotelsPageState extends State<ChatbotHotelsPage> {
 
   @override
   Widget build(BuildContext context) {
-    TextEditingController textController = TextEditingController(); // Contrôleur pour gérer le champ texte
+    TextEditingController textController =
+        TextEditingController(); // Contrôleur pour gérer le champ texte
 
     return Scaffold(
       appBar: AppBar(
@@ -499,8 +598,8 @@ class _ChatbotHotelsPageState extends State<ChatbotHotelsPage> {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.stretch, // Étend les messages horizontalement
+                        crossAxisAlignment: CrossAxisAlignment
+                            .stretch, // Étend les messages horizontalement
                         children: [
                           // Texte reconnu (à droite, utilisateur)
                           Row(
@@ -515,7 +614,8 @@ class _ChatbotHotelsPageState extends State<ChatbotHotelsPage> {
                                     borderRadius: BorderRadius.circular(15),
                                   ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       const Text(
                                         "Texte Reconnu :",
@@ -524,7 +624,8 @@ class _ChatbotHotelsPageState extends State<ChatbotHotelsPage> {
                                           color: Colors.white,
                                         ),
                                       ),
-                                      const SizedBox(height: 5), // Espacement léger
+                                      const SizedBox(
+                                          height: 5), // Espacement léger
                                       Text(
                                         capitalize(_recognizedText),
                                         style: const TextStyle(
@@ -538,7 +639,8 @@ class _ChatbotHotelsPageState extends State<ChatbotHotelsPage> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 20), // Espacement entre les messages
+                          const SizedBox(
+                              height: 20), // Espacement entre les messages
 
                           // Réponse IA (à gauche)
                           Row(
@@ -553,7 +655,8 @@ class _ChatbotHotelsPageState extends State<ChatbotHotelsPage> {
                                     borderRadius: BorderRadius.circular(15),
                                   ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       const Text(
                                         "Réponse IA :",
@@ -562,7 +665,8 @@ class _ChatbotHotelsPageState extends State<ChatbotHotelsPage> {
                                           color: Colors.white,
                                         ),
                                       ),
-                                      const SizedBox(height: 5), // Espacement léger
+                                      const SizedBox(
+                                          height: 5), // Espacement léger
                                       Text(
                                         _aiResponse,
                                         style: const TextStyle(
@@ -594,10 +698,12 @@ class _ChatbotHotelsPageState extends State<ChatbotHotelsPage> {
                       onSubmitted: (value) {
                         if (value.isNotEmpty) {
                           setState(() {
-                            _recognizedText = value; // Enregistrer le texte saisi
+                            _recognizedText =
+                                value; // Enregistrer le texte saisi
                           });
                           handleQuestion(value); // Lancer le traitement
-                          textController.clear(); // Réinitialiser le champ après envoi
+                          textController
+                              .clear(); // Réinitialiser le champ après envoi
                         }
                       },
                       decoration: InputDecoration(
@@ -608,10 +714,13 @@ class _ChatbotHotelsPageState extends State<ChatbotHotelsPage> {
                           onPressed: () {
                             if (textController.text.isNotEmpty) {
                               setState(() {
-                                _recognizedText = textController.text; // Enregistrer le texte
+                                _recognizedText =
+                                    textController.text; // Enregistrer le texte
                               });
-                              handleQuestion(_recognizedText); // Lancer le traitement
-                              textController.clear(); // Réinitialiser après envoi
+                              handleQuestion(
+                                  _recognizedText); // Lancer le traitement
+                              textController
+                                  .clear(); // Réinitialiser après envoi
                             }
                           },
                         ),
@@ -627,8 +736,10 @@ class _ChatbotHotelsPageState extends State<ChatbotHotelsPage> {
                     ),
                     label: Text(_isListening ? "Stop" : "Écouter"),
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-                      backgroundColor: _isListening ? Colors.red : const Color(0xFF2A2A72),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 16, horizontal: 20),
+                      backgroundColor:
+                          _isListening ? Colors.red : const Color(0xFF2A2A72),
                     ),
                   ),
                 ],
@@ -684,7 +795,8 @@ class _ChatbotGeneralPageState extends State<ChatbotGeneralPage> {
     });
 
     if (!_isListening) {
-      await utils.speak(_aiResponse); // Lire la réponse uniquement si l'écoute est terminée
+      await utils.speak(
+          _aiResponse); // Lire la réponse uniquement si l'écoute est terminée
     }
   }
 
@@ -811,7 +923,8 @@ class _ChatbotGeneralPageState extends State<ChatbotGeneralPage> {
       _isListening = false;
     });
     utils.stopListening();
-    handleQuestion(_recognizedText); // Traite la question après avoir stoppé l'écoute
+    handleQuestion(
+        _recognizedText); // Traite la question après avoir stoppé l'écoute
   }
 
   @override
